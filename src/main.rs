@@ -35,7 +35,7 @@ struct Game {
   settings: Settings,
   round: usize,
   field: Field,
-  players: HashMap<String, Player>
+  players: HashMap<String, Player>,
 }
 
 impl Game {
@@ -48,11 +48,13 @@ impl Game {
 
   fn update(&mut self, update_type: &str, key: &str, value: &str) {
     match update_type {
-      "game" => match key {
-        "round" => self.round = value.parse().unwrap(),
-        "field" => self.field = parse_field(&self.settings, value),
-        _ => {}
-      },
+      "game" => {
+        match key {
+          "round" => self.round = value.parse().unwrap(),
+          "field" => self.field = parse_field(&self.settings, value),
+          _ => {}
+        }
+      }
       pid => {
         let mut player = self.players.entry(pid.to_owned()).or_insert_with(Default::default);
         player.update(key, value.parse().unwrap());
@@ -68,25 +70,22 @@ struct Field {
 
 fn parse_field(settings: &Settings, field: &str) -> Field {
   let parsed_cells: Vec<_> = field.split(",")
-      .map(|cell| parse_cell(cell))
-      .collect();
+    .map(|cell| parse_cell(cell))
+    .collect();
   Field {
-    cells: parsed_cells
-      .chunks(settings.field_width)
+    cells: parsed_cells.chunks(settings.field_width)
       .map(|iter| iter.to_vec())
-      .collect()
+      .collect(),
   }
 }
 
 #[derive(Clone, Debug)]
 struct Cell {
-  types: Vec<CellType>
+  types: Vec<CellType>,
 }
 
 fn parse_cell(cell: &str) -> Cell {
-  Cell {
-    types: cell.split(";").map(|cell_type| parse_cell_type(cell_type)).collect()
-  }
+  Cell { types: cell.split(";").map(|cell_type| parse_cell_type(cell_type)).collect() }
 }
 
 #[derive(Clone, Debug)]
@@ -158,66 +157,51 @@ impl fmt::Display for ChooseCharacter {
 }
 
 #[derive(Debug)]
-enum MoveType {
+enum Direction {
   Up,
   Down,
   Left,
   Right,
-  Pass,
 }
 
-impl fmt::Display for MoveType {
+impl fmt::Display for Direction {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     write!(f,
            "{}",
            match *self {
-             MoveType::Up => "up",
-             MoveType::Down => "down",
-             MoveType::Left => "left",
-             MoveType::Right => "right",
-             MoveType::Pass => "pass",
+             Direction::Up => "up",
+             Direction::Down => "down",
+             Direction::Left => "left",
+             Direction::Right => "right",
            })
   }
 }
 
 #[derive(Debug)]
-struct DropBomb {
-  rounds: usize,
-}
-
-impl fmt::Display for DropBomb {
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    write!(f, "drop_bomb {}", self.rounds)
-  }
-}
-
-#[derive(Debug)]
-struct Move {
-  move_type: MoveType,
-  drop_bomb: Option<DropBomb>,
+enum Move {
+  Direction { direction: Direction },
+  DropBomb { direction: Direction, rounds: usize },
+  Pass,
 }
 
 impl fmt::Display for Move {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    write!(f,
-           "{}{}",
-           self.move_type,
-           match self.drop_bomb {
-             Some(ref db) => format!(";{}", db),
-             None => String::new(),
-           })
+    match *self {
+      Move::Direction { ref direction } => write!(f, "{}", direction),
+      Move::DropBomb { ref direction, ref rounds } => {
+        write!(f, "{};drop_bomb {}", direction, rounds)
+      }
+      Move::Pass => write!(f, "pass"),
+    }
   }
 }
 
-fn choose_character(_time: usize) -> ChooseCharacter {
+fn action_character(_time: usize) -> ChooseCharacter {
   ChooseCharacter::Bixie
 }
 
-fn calculate_move(game: &Game, _time: usize) -> Move {
-  Move {
-    move_type: MoveType::Pass,
-    drop_bomb: None
-  }
+fn action_move(game: &Game, _time: usize) -> Move {
+  Move::Pass
 }
 
 fn main() {
@@ -234,11 +218,13 @@ fn main() {
     match commands[0] {
       "settings" => game.update_settings(commands[1], commands[2]),
       "update" => game.update(commands[1], commands[2], commands[3]),
-      "action" => match commands[1] {
-        "character" => println!("{}", choose_character(commands[2].parse().unwrap())),
-        "move" => println!("{}", calculate_move(&game, commands[2].parse().unwrap())),
-        _ => {}
-      },
+      "action" => {
+        match commands[1] {
+          "character" => println!("{}", action_character(commands[2].parse().unwrap())),
+          "move" => println!("{}", action_move(&game, commands[2].parse().unwrap())),
+          _ => {}
+        }
+      }
       _ => {}
     }
   }
