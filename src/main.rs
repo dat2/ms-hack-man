@@ -32,23 +32,25 @@ impl Settings {
 
 #[derive(Debug, Default)]
 struct Game {
+  settings: Settings,
   round: usize,
   field: Field,
   players: HashMap<String, Player>
 }
 
 impl Game {
-  fn update_players(&mut self, settings: &Settings) {
-    for pid in &settings.player_names {
+  fn update_settings(&mut self, key: &str, value: &str) {
+    self.settings.update(key, value);
+    for pid in &self.settings.player_names {
       self.players.insert(pid.to_owned(), Default::default());
     }
   }
 
-  fn update(&mut self, settings: &Settings, update_type: &str, key: &str, value: &str) {
+  fn update(&mut self, update_type: &str, key: &str, value: &str) {
     match update_type {
       "game" => match key {
         "round" => self.round = value.parse().unwrap(),
-        "field" => self.field = parse_field(settings, value),
+        "field" => self.field = parse_field(&self.settings, value),
         _ => {}
       },
       pid => {
@@ -211,7 +213,7 @@ fn choose_character(_time: usize) -> ChooseCharacter {
   ChooseCharacter::Bixie
 }
 
-fn calculate_move(settings: &Settings, game: &Game, _time: usize) -> Move {
+fn calculate_move(game: &Game, _time: usize) -> Move {
   Move {
     move_type: MoveType::Pass,
     drop_bomb: None
@@ -219,7 +221,6 @@ fn calculate_move(settings: &Settings, game: &Game, _time: usize) -> Move {
 }
 
 fn main() {
-  let mut settings: Settings = Default::default();
   let mut game: Game = Default::default();
 
   let stdin = io::stdin();
@@ -231,14 +232,11 @@ fn main() {
     let commands: Vec<_> = input.split(" ").collect();
 
     match commands[0] {
-      "settings" => {
-        settings.update(commands[1], commands[2]);
-        game.update_players(&settings);
-      },
-      "update" => game.update(&settings, commands[1], commands[2], commands[3]),
+      "settings" => game.update_settings(commands[1], commands[2]),
+      "update" => game.update(commands[1], commands[2], commands[3]),
       "action" => match commands[1] {
         "character" => println!("{}", choose_character(commands[2].parse().unwrap())),
-        "move" => println!("{}", calculate_move(&settings, &game, commands[2].parse().unwrap())),
+        "move" => println!("{}", calculate_move(&game, commands[2].parse().unwrap())),
         _ => {}
       },
       _ => {}
