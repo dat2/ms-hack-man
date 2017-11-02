@@ -205,7 +205,11 @@ impl fmt::Display for Move {
   }
 }
 
-fn calculate_move(settings: &Settings, game: &Game, players: &Players) -> Move {
+fn choose_character(_time: usize) -> ChooseCharacter {
+  ChooseCharacter::Bixie
+}
+
+fn calculate_move(settings: &Settings, game: &Game, players: &Players, _time: usize) -> Move {
   Move {
     move_type: MoveType::Pass,
     drop_bomb: None
@@ -223,17 +227,17 @@ fn main() {
     stdin.read_line(&mut input).unwrap();
     input.pop();
 
-    let split: Vec<_> = input.split(" ").collect();
+    let commands: Vec<_> = input.split(" ").collect();
 
-    match split[0] {
-      "settings" => settings.update(split[1], split[2]),
-      "update" => match split[1] {
-        "game" => game.update(&settings, split[2], split[3]),
-        pid => players.update(pid.parse().unwrap(), split[2], split[3].parse().unwrap())
+    match commands[0] {
+      "settings" => settings.update(commands[1], commands[2]),
+      "update" => match commands[1] {
+        "game" => game.update(&settings, commands[2], commands[3]),
+        pid => players.update(pid.parse().unwrap(), commands[2], commands[3].parse().unwrap())
       },
-      "action" => match split[1] {
-        "character" => println!("{}", ChooseCharacter::Bixie),
-        "move" => println!("{}", calculate_move(&settings, &game, &players)),
+      "action" => match commands[1] {
+        "character" => println!("{}", choose_character(commands[2].parse().unwrap())),
+        "move" => println!("{}", calculate_move(&settings, &game, &players, commands[2].parse().unwrap())),
         _ => {}
       },
       _ => {}
