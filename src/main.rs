@@ -28,6 +28,10 @@ impl Settings {
       _ => {}
     }
   }
+
+  fn index_to_coords(&self, index: usize) -> (usize, usize) {
+    (index / self.field_width, index % self.field_width)
+  }
 }
 
 #[derive(Debug, Default)]
@@ -66,16 +70,40 @@ impl Game {
 #[derive(Debug, Default)]
 struct Field {
   cells: Vec<Vec<Cell>>,
+  snippets: Vec<(usize, usize)>,
+  me: (usize, usize),
+  others: Vec<(usize, usize)>
 }
 
 fn parse_field(settings: &Settings, field: &str) -> Field {
   let parsed_cells: Vec<_> = field.split(",")
     .map(|cell| parse_cell(cell))
     .collect();
+
+  let mut snippets = Vec::new();
+  let mut me = (0,0);
+  let mut others = Vec::new();
+  for (index, cell) in parsed_cells.iter().enumerate() {
+    if cell.has_code_snippet() {
+      snippets.push(settings.index_to_coords(index));
+    }
+
+    for id in cell.player_ids() {
+      if id == settings.my_bot_id {
+        me = settings.index_to_coords(index);
+      } else {
+        others.push(settings.index_to_coords(index));
+      }
+    }
+  }
+
   Field {
     cells: parsed_cells.chunks(settings.field_width)
       .map(|iter| iter.to_vec())
       .collect(),
+    snippets: snippets,
+    me: me,
+    others: others
   }
 }
 
@@ -84,11 +112,21 @@ struct Cell {
   types: Vec<CellType>,
 }
 
+impl Cell {
+  fn has_code_snippet(&self) -> bool {
+    self.types.iter().cloned().find(|t| t == &CellType::CodeSnippet).is_some()
+  }
+
+  fn player_ids(&self) -> Vec<usize> {
+    self.types.iter().cloned().filter_map(|t| t.player_id()).collect()
+  }
+}
+
 fn parse_cell(cell: &str) -> Cell {
   Cell { types: cell.split(";").map(|cell_type| parse_cell_type(cell_type)).collect() }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 enum CellType {
   Nothing,
   Inaccessible,
@@ -100,6 +138,16 @@ enum CellType {
   Mine { rounds_before_explode: usize },
   PickUpMine,
   CodeSnippet,
+}
+
+impl CellType {
+  fn player_id(&self) -> Option<usize> {
+    if let &CellType::Player { id } = self {
+      Some(id)
+    } else {
+      None
+    }
+  }
 }
 
 fn parse_cell_type(cell_type: &str) -> CellType {
@@ -196,16 +244,26 @@ impl fmt::Display for Move {
   }
 }
 
-fn action_character(_time: usize) -> ChooseCharacter {
-  ChooseCharacter::Bixie
+trait AI {
+  fn action_character(&mut self, time: usize) -> ChooseCharacter;
+  fn action_move(&mut self, game: &Game, time: usize) -> Move;
 }
 
-fn action_move(game: &Game, _time: usize) -> Move {
-  Move::Pass
+struct Basic;
+
+impl AI for Basic {
+  fn action_character(&mut self, _time: usize) -> ChooseCharacter {
+    ChooseCharacter::Bixie
+  }
+
+  fn action_move(&mut self, game: &Game, _time: usize) -> Move {
+    Move::Pass
+  }
 }
 
 fn main() {
   let mut game: Game = Default::default();
+  let mut ai = Basic;
 
   let stdin = io::stdin();
   loop {
@@ -220,8 +278,8 @@ fn main() {
       "update" => game.update(commands[1], commands[2], commands[3]),
       "action" => {
         match commands[1] {
-          "character" => println!("{}", action_character(commands[2].parse().unwrap())),
-          "move" => println!("{}", action_move(&game, commands[2].parse().unwrap())),
+          "character" => println!("{}", ai.action_character(commands[2].parse().unwrap())),
+          "move" => println!("{}", ai.action_move(&game, commands[2].parse().unwrap())),
           _ => {}
         }
       }
